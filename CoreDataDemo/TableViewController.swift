@@ -4,69 +4,97 @@ import CoreData
 
 class TableViewController: UITableViewController {
     
-    var toDoItems: [Task] = []
+    var tasks: [Task] = []
 
     @IBAction func addTask(_ sender: UIBarButtonItem) {
-        let ac = UIAlertController(title: "Add Task", message: "add new task", preferredStyle: .alert)
+        let alertController = UIAlertController(title: "Add Task", message: "add new task", preferredStyle: .alert)
         let ok = UIAlertAction(title: "Ok", style: .default) { action in
-            let textField = ac.textFields?[0]
-            self.saveTask(taskToDo: (textField?.text)!)
-            self.tableView.reloadData()
+            
+            let textField = alertController.textFields?.first
+            if let newTaskTitle = textField?.text {
+                
+                self.saveTask(withTitle: newTaskTitle)
+                self.tableView.reloadData()
+            }
         }
         
         let cancel = UIAlertAction(title: "Cancel", style: .default, handler: nil)
         
-        ac.addTextField {
+        alertController.addTextField {
             textField in
         }
         
-        ac.addAction(ok)
-        ac.addAction(cancel)
+        alertController.addAction(ok)
+        alertController.addAction(cancel)
         
-        present(ac, animated: true, completion: nil)
+        present(alertController, animated: true, completion: nil)
         
     }
     
-    func saveTask(taskToDo: String) {
+    private func saveTask(withTitle title: String) {
         
-        let appDelegate = UIApplication.shared.delegate as! AppDelegate
-        let context = appDelegate.persistentContainer.viewContext
-        let entity = NSEntityDescription.entity(forEntityName: "Task", in: context)
+        let context = getContext()
         
-        let taskObject = NSManagedObject(entity: entity!, insertInto: context) as! Task
+        guard let entity = NSEntityDescription.entity(forEntityName: "Task", in: context) else { return }
         
-        taskObject.taskToDo = taskToDo
+        let taskObject = Task(entity: entity, insertInto: context)
+        
+        taskObject.title = title
         
         do {
             try context.save()
-            toDoItems.append(taskObject)
+            tasks.append(taskObject)
             print("Saved. Good job!")
-        } catch {
+        } catch let error as NSError {
             print(error.localizedDescription)
         }
     }
     
-    override func viewWillAppear(_ animated: Bool) {
+    private func getContext() -> NSManagedObjectContext {
         
         let appDelegate = UIApplication.shared.delegate as! AppDelegate
-        let context = appDelegate.persistentContainer.viewContext
+        return appDelegate.persistentContainer.viewContext
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        
+        super.viewWillAppear(animated)
+        
+        let context = getContext()
+        
         let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
         
+        let sortDescriptor = NSSortDescriptor(key: "title", ascending: false)
+        fetchRequest.sortDescriptors = [sortDescriptor]
+        
         do {
-            toDoItems = try context.fetch(fetchRequest)
-        } catch {
+            tasks = try context.fetch(fetchRequest)
+        } catch let error as NSError {
             print(error.localizedDescription)
         }
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+//        let context = getContext()
+//
+//        let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+//
+//        if let object = try? context.fetch(fetchRequest) {
+//            for object in object {
+//                context.delete(object)
+//            }
+//        }
+//
+//        do {
+//            try context.save()
+//            print("Deleted. Good job!")
+//        } catch let error as NSError {
+//            print(error.localizedDescription)
+//        }
 
-        // Uncomment the following line to preserve selection between presentations
-        // self.clearsSelectionOnViewWillAppear = false
 
-        // Uncomment the following line to display an Edit button in the navigation bar for this view controller.
-        // self.navigationItem.rightBarButtonItem = self.editButtonItem
     }
 
     // MARK: - Table view data source
@@ -78,38 +106,58 @@ class TableViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         // #warning Incomplete implementation, return the number of rows
-        return toDoItems.count
+        return tasks.count
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
         
-        let task = toDoItems[indexPath.row]
-        cell.textLabel?.text = task.taskToDo
+        let task = tasks[indexPath.row]
+        cell.textLabel?.text = task.title
 
         return cell
     }
 
 
-    /*
-    // Override to support conditional editing of the table view.
-    override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
-        // Return false if you do not want the specified item to be editable.
-        return true
+    
+    override func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCell.EditingStyle {
+        return .delete
     }
-    */
 
-    /*
+
     // Override to support editing the table view.
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
-            // Delete the row from the data source
+            
+            tableView.beginUpdates()
+            
+            let context = getContext()
+            let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+            
+            if let object = try? context.fetch(fetchRequest) {
+                for object in object {
+                        context.delete(object)
+                }
+            }
+            
+            do {
+                try context.save()
+                tasks.remove(at: indexPath.row)
+                print("Deleted. Good job!")
+            } catch let error as NSError {
+                print(error.localizedDescription)
+            }
+            
             tableView.deleteRows(at: [indexPath], with: .fade)
+            
+            tableView.endUpdates()
+            
+            
         } else if editingStyle == .insert {
             // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
         }    
     }
-    */
+
 
     /*
     // Override to support rearranging the table view.
